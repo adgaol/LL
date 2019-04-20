@@ -1,0 +1,4 @@
+EXP::= B {A.valor=B.result;} A ; {print(A.result)}
+A::= + B {A1.valor=A.valor+B.result;} A1 {A.result=A1.result;} | ? {A.result=A.valor;}
+B::= num {C.valor=num.vlex;} C {B.resul=C.resul;}
+C::= * num {C1.valor=C.valor*num.vlex;} C1 {C.resul=C1.resul;} | ? {C.resul=C.valor;}

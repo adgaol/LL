@@ -16,6 +16,8 @@ public class DescendantLL {
      */
     public static void main(String[] args) {
         LL ll= new LL("Descendant.txt");
+        ll.build();
+        ll.proccess("2 * 4 + 3 ;");
     }
     
 }

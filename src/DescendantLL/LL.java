@@ -52,6 +52,18 @@ public class LL {
     private Document doc;
     private Integer ruleCount=1;
     private ArrayList<String> antecedentes;
+    private Integer numNodos=0;
+    private ArrayList<Node> nodes;
+    private Integer nivel;
+    private Integer altura=0;
+    private Integer paso=0;
+    private ArrayList<Paso> steps;
+    private HashMap<String, Integer> relNodes;
+    private HashMap<String,String> ruleId;//production, id of the rule
+    private HashMap<String,String> idsRules;//id of the rule,production
+    
+    private HashMap<String, Stack<String>> symbolRules;
+    
     public LL( String path) {
         this.grammar = new HashMap<>();
         this.grammarWithActions = new HashMap<>();
@@ -70,9 +82,13 @@ public class LL {
         this.numRules=new HashMap<>();
         this.indexRules=new HashMap<>();
         this.values=new HashMap<>();
-        
+        this.nodes=new ArrayList<>();
         //this.table= new Integer[this.noTerminals.size()][this.terminals.size()];
-        
+        this.steps=new ArrayList<Paso>();
+        this.relNodes=new HashMap<>();
+        this.ruleId=new HashMap<>();
+        this.symbolRules=new HashMap<>();
+        this.idsRules=new HashMap<>();
         System.out.println("ce finit");
     }
     /**
@@ -111,78 +127,200 @@ public class LL {
         espec.setAttributeNode(attr); 
         writeTraductor(espec);
         Stack<String> stack=new Stack<>();
-        stack.push("$");
+//        stack.push("$");
+//        stack.push("$");
         stack.push(axioma);
+        nivel=1;
+//        Node axiom=new Node(numNodos,axioma , false, nivel);
+//        numNodos++;
+//        nodes.add(axiom);
         Stack<String> stackChain=new Stack<>();
-        stackChain.push("$");
+        String stackChainRead="";
+//        Stack<String> stackChainRead=new Stack<>();
+//        stackChain.push("$");
         //String[] chain=transformChain(entryChain).split(" ");
         String[] chain=entryChain.split(" ");
         for(int i=chain.length-1;i>=0;i--){
             stackChain.push(chain[i]);
         }
         while(!stack.isEmpty()){
-            if(Character.isDigit(stackChain.peek().charAt(0))){
-                Double value=Double.parseDouble(stackChain.pop());
-                values.put("num.vlex", value);
-                stackChain.push("num");
-            }
-            if(stack.peek().equals(stackChain.peek())){
+            if(stack.peek().equals("$")){
                 stack.pop();
-                stackChain.pop();
+                nivel--;
             }
             else{
-                if(!stack.peek().startsWith("{")){
-                    
-                    if(stack.peek().equals("λ")){
-                        stack.pop();
-                        
+                String pendChain=representChain(stackChain);
+                if(!stackChain.isEmpty()&&Character.isDigit(stackChain.peek().charAt(0))){
+                    Double value=Double.parseDouble(stackChain.pop());
+                    values.put("num.vlex", value);
+                    stackChain.push("num");
+                }
+                if(!stackChain.isEmpty()&&stack.peek().equals(stackChain.peek())){
+                    String element=stack.pop();
+                    Paso p=null;
+                    if(element.equals("num")){
+                        stackChainRead+=" "+values.get("num.vlex").toString();
+                        stackChain.pop();
+                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element,"num.vlex="+ values.get("num.vlex").toString(),relNodes.get(element), null, null);
                     }
                     else{
-                        if(!grammarWithActions.containsKey(stack.peek())){
-                            String symbol=stack.pop();
-                            Integer index=getNumberIndex(symbol);
-                            stack.push(symbol.substring(0, index));
+                        stackChainRead+=" "+stackChain.pop();
+                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, null,relNodes.get(element), null, null);
+                    }
+                   
+                    
+                    Node node=new Node(numNodos,element , true, nivel);
+                    numNodos++;
+                    nodes.add(node);
+                    
+                    //Paso p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, values.get("num.vlex").toString(),relNodes.get(element), null, null);
+                    
+                    steps.add(p);
+                    paso++;
+                    
+                }
+                else{
+                    if(!stack.peek().startsWith("{")){
+
+                        if(stack.peek().equals("λ")){
+                            String element=stack.pop();
+                            
+                            Node node=new Node(numNodos,element , true, nivel);
+                            numNodos++;
+                            nodes.add(node);
+                            String idRule=symbolRules.get(element).pop();
+                            Paso p=new Paso(paso, "derivacion", stackChainRead.substring(1), representChain(stackChain), element, null, relNodes.get(element), idRule, idsRules.get(idRule).split(" ").length);
+                                
+                            steps.add(p);
+                            paso++;
                         }
                         else{
-                            Integer num=table.get(stack.pop()).get(stackChain.peek());
-                            String production=numRules.get(num);
-                            String[] symbols=production.split(" ");
-                            
-                            for(int i=symbols.length-1;i>0;i--){
-                                stack.push(symbols[i]);
+                            if(!grammarWithActions.containsKey(stack.peek())){
+                                String symbol=stack.pop();
+                                Integer index=getNumberIndex(symbol);
+                                stack.push(symbol.substring(0, index));
+
+                                Integer num=table.get(stack.pop()).get(stackChain.peek());
+                                String production=numRules.get(num);
+                                String[] symbols=production.split(" ");
+                                stack.push("$");
+                                for(int i=symbols.length-1;i>0;i--){
+                                    stack.push(symbols[i]);
+                                    relNodes.put(symbols[i],paso);
+                                    Stack<String> ids=null;
+                                    if(symbolRules.get(symbols[i])==null){
+                                        ids=new Stack<>();
+                                        symbolRules.put(symbols[i], ids);
+                                    }
+                                    else{
+                                        ids=symbolRules.get(symbols[i]);
+                                    }
+                                    ids.push(ruleId.get(production));
+                                }
+
+                                nivel++;
+                                altura=Math.max(altura, nivel);
+                                Node node=new Node(numNodos,symbol , false, nivel-1);
+                                numNodos++;
+                                nodes.add(node);
+                                String idRule=symbolRules.get(symbol).pop();
+                                String readChain=null;
+                                if(!stackChainRead.isEmpty())
+                                        readChain=stackChainRead.substring(1);
+                                String value=symbol+".result=null";
+                                if(values.get(symbol)!=null)
+                                    value=values.get(symbol).toString();
+                                Paso p=new Paso(paso, "derivacion", readChain, representChain(stackChain), symbol, value, relNodes.get(symbol), idRule, idsRules.get(idRule).split(" ").length);
+                                
+                                steps.add(p);
+                                paso++;
+
+                            }
+                            else{
+                                String element=stack.pop();
+                                Integer num=table.get(element).get(stackChain.peek());
+                                String production=numRules.get(num);
+                                String[] symbols=production.split(" ");
+                                stack.push("$");
+                                for(int i=symbols.length-1;i>0;i--){
+                                    stack.push(symbols[i]);
+                                    relNodes.put(symbols[i],paso);
+                                    Stack<String> ids=null;
+                                    if(symbolRules.get(symbols[i])==null){
+                                        ids=new Stack<>();
+                                        symbolRules.put(symbols[i], ids);
+                                    }
+                                    else{
+                                        ids=symbolRules.get(symbols[i]);
+                                    }
+                                    ids.push(ruleId.get(production));
+                                }
+
+                                nivel++;
+                                altura=Math.max(altura, nivel);
+                                Node node=new Node(numNodos,element , false, nivel-1);
+                                numNodos++;
+                                nodes.add(node);
+                                Paso p=null;
+                                if(axioma.equals(element)){
+                                    p=new Paso(paso, "primero", null, representChain(stackChain), element, null, relNodes.get(element), null, null);
+                                }
+                                else{
+                                    String idRule=symbolRules.get(element).pop();
+                                    String readChain=null;
+                                    if(!stackChainRead.isEmpty())
+                                        readChain=stackChainRead.substring(1);
+                                    String value=element+".result=null";;
+                                    if(values.get(element)!=null)
+                                        value=values.get(element).toString();
+                                    p=new Paso(paso, "derivacion", readChain, representChain(stackChain), element, value, relNodes.get(element), idRule, idsRules.get(idRule).split(" ").length);
+                                }
+                                steps.add(p);
+                                paso++;
                             }
                         }
                     }
-                }
-                else{
-                    String action=stack.pop();
-                    
-                    String[] varValue=action.substring(1,action.length()-2).split("=");
-                    
-                    Integer position=getNumberIndex(varValue[0].split("\\.")[0]);
-                    
-                    if(varValue.length>1){
-                        if (position<varValue[0].split("\\.")[0].length()){
-                            varValue[0]=varValue[0].split("\\.")[0].substring(0,position)+"."+varValue[0].split("\\.")[1];
+                    else{
+                        String action=stack.pop();
 
-                        }
-                        position=getNumberIndex(varValue[1].split("\\.")[0]);
-                        if (position<varValue[1].split("\\.")[0].length()){
-                            varValue[1]=varValue[1].split("\\.")[0].substring(0,position)+"."+varValue[1].split("\\.")[1];
+                        String[] varValue=action.substring(1,action.length()-2).split("=");
 
-                        }
-                        if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
-                            Double value=calculateValue(varValue[1]);
-                            values.put(varValue[0], value);
-                        }
+                        Integer position=getNumberIndex(varValue[0].split("\\.")[0]);
+                        Paso pasoActual=steps.get(steps.size()-1);
+                        if(varValue.length>1){
+                            if (position<varValue[0].split("\\.")[0].length()){
+                                varValue[0]=varValue[0].split("\\.")[0].substring(0,position)+"."+varValue[0].split("\\.")[1];
 
-                        else{
-                            values.put(varValue[0], values.get(varValue[1]));
+                            }
+                            position=getNumberIndex(varValue[1].split("\\.")[0]);
+                            if (position<varValue[1].split("\\.")[0].length()){
+                                varValue[1]=varValue[1].split("\\.")[0].substring(0,position)+"."+varValue[1].split("\\.")[1];
+
+                            }
+                            if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
+                                Double value=calculateValue(varValue[1]);
+                                values.put(varValue[0], value);
+                            }
+
+                            else{
+                                values.put(varValue[0], values.get(varValue[1]));
+                            }
+                            ArrayList<Paso> stepsBefore=findSteps(varValue[0],pasoActual);
+                            for (Paso stepBefore:stepsBefore){
+                                pasoActual.getChangedNodes().add(stepBefore.getId());
+                                pasoActual.getChanges().add(varValue[0]+"="+values.get(varValue[0]));
+                                
+                            }
+                            
+                            
                         }
                     }
-                }
+                }    
            }
        }
+    nivel++;
+    writeArbol(espec);
+    writeContenido(espec);
     TransformerFactory transformerFactory = TransformerFactory.newInstance();
     Transformer transformer=null;
         try {
@@ -258,6 +396,27 @@ public class LL {
                 else{
                     result+=symbol.substring(0, getNumberIndex(symbol))+" ";
                 }
+            }
+        }
+        return result.substring(0, result.length()-1);
+    }
+    /**
+     * Remove the semantics actions only
+     * @param production
+     * production where remove the actions
+     * @return 
+     * a production without the actions
+     */
+    public String removeOnlyActions(String production){
+        String[] symbols=production.split(" ");
+        String result="";
+        for(int i=0;i<symbols.length;i++){
+            String symbol=symbols[i];
+            if(!symbol.startsWith("{")){
+                
+                    result+=symbol+" ";
+                
+                
             }
         }
         return result.substring(0, result.length()-1);
@@ -707,10 +866,11 @@ public class LL {
         return result;
     } 
     /**
-     * write the part of tradutor and cadene in a xml
+     * write the part of <traductor> and <cadena> in a xml
      * @param espec 
-     * start of xml
+     * element where insert this part.
      */
+     
     private void writeTraductor(Element espec) {
         Element traductor = doc.createElement("traductor");
         espec.appendChild(traductor); 
@@ -737,6 +897,8 @@ public class LL {
      */
     private void addRule(String antecedent ,String production,Element traductor) {
         String id="R"+ruleCount;
+        ruleId.put(production, id);
+        idsRules.put(id, antecedent+"::="+production);
         Element regla=doc.createElement("regla");
         traductor.appendChild(regla);
         Attr attrRegla = doc.createAttribute("id");
@@ -840,6 +1002,138 @@ public class LL {
                     terminal.setTextContent("false");
                 else
                     terminal.setTextContent("true");
+            }
+        }
+    }
+    /**
+     * write the part of <arbol> of the xml
+     * @param espec 
+     * element where insert this part.
+     */
+    private void writeArbol(Element espec) {
+       Element arbol = doc.createElement("arbol");
+       espec.appendChild(arbol);
+       Element numNodosE = doc.createElement("num_nodos");
+       arbol.appendChild(numNodosE);
+       numNodosE.setTextContent(nodes.size()+"");
+       Element alturaE = doc.createElement("altura");
+       arbol.appendChild(alturaE);
+       alturaE.setTextContent(altura.toString());
+       for(Node node:nodes){
+           Element nodo = doc.createElement("nodo");
+           Attr id = doc.createAttribute("id");
+           id.setValue(node.getId()+"");
+           nodo.setAttributeNode(id);
+           arbol.appendChild(nodo);
+           Element element = doc.createElement("elemento");
+           nodo.appendChild(element);
+           element.setTextContent(node.getElement());
+           Element level = doc.createElement("nivel");
+           nodo.appendChild(level);
+           level.setTextContent(node.getNivel().toString());
+           Element terminal = doc.createElement("terminal");
+           nodo.appendChild(terminal);
+           terminal.setTextContent(node.getTerminal().toString());
+       }
+    }
+    /**
+     * transform the pending chain stack into a String
+     * @param stackChain
+     * stack to transform
+     * @return 
+     * the pending chain how String
+     */
+    private String representChain(Stack<String> stackChain) {
+        String result="";
+        for(String elem:stackChain){
+            if(elem.equals("num"))
+                result=values.get("num.vlex")+" "+result;
+            else
+                result=elem+" "+result;
+        }
+        return result;
+    }
+    /**
+     * find all steps that content the changedValue.
+     * @param changeValue
+     * value to find
+     * @param pasoActual
+     * start step to search
+     * @return 
+     * list of the steps that content the changedValue.
+     */
+    private ArrayList<Paso> findSteps(String changeValue, Paso pasoActual) {
+       Paso step=pasoActual;
+       ArrayList<Paso> pasos=new ArrayList<>();
+       while (step.getRelNodo()>0){
+           if(step.getValor()!=null && step.getValor().contains(changeValue))
+               pasos.add(step);
+           step=steps.get(step.getRelNodo());
+       }
+       return pasos;
+    }
+    /**
+     * write the part of <contenido> of the xml
+     * @param espec 
+     * element where insert this part.
+     */
+    private void writeContenido(Element espec) {
+        Element contenido = doc.createElement("contenido");
+        espec.appendChild(contenido);
+        for(Paso step:steps){
+            Element pasoE = doc.createElement("paso");
+            Attr id = doc.createAttribute("id");
+            id.setValue(step.getId()+"");
+            pasoE.setAttributeNode(id);
+            contenido.appendChild(pasoE);
+            Element tipo = doc.createElement("tipo");
+            tipo.setTextContent(step.getTipo());
+            pasoE.appendChild(tipo);
+            if(step.getRegla()!=null){
+                Element nuevaRegla = doc.createElement("nuevaRegla");
+                Attr refRegla = doc.createAttribute("refRegla");
+                refRegla.setValue(step.getRegla());
+                nuevaRegla.setTextContent(removeOnlyActions(idsRules.get(step.getRegla())));
+                nuevaRegla.setAttributeNode(refRegla); 
+                pasoE.appendChild(nuevaRegla); 
+                Element widthRegla = doc.createElement("widthRegla");
+                widthRegla.setTextContent(step.getWidthRule().toString());
+                pasoE.appendChild(widthRegla); 
+            }
+
+            Element cadena = doc.createElement("cadena");
+            pasoE.appendChild(cadena);
+            Element leido = doc.createElement("leido");
+            leido.setTextContent(step.getLeido());
+            cadena.appendChild(leido);
+            Element pendiente = doc.createElement("pendiente");
+            pendiente.setTextContent(step.getPendiente());
+            cadena.appendChild(pendiente);
+            Element elemento = doc.createElement("elemento");
+            elemento.setTextContent(step.getElemento());
+            pasoE.appendChild(elemento);
+            if(step.getRelNodo()!=null){
+                Element relNodos = doc.createElement("relNodos");
+                relNodos.setTextContent(step.getRelNodo().toString());
+                pasoE.appendChild(relNodos);
+            }
+            Element valor = doc.createElement("valor");
+            valor.setTextContent(step.getValor());
+            pasoE.appendChild(valor);
+            if(!step.getChangedNodes().isEmpty()){
+                Element accionSemanticaEjecutada = doc.createElement("accionSemanticaEjecutada");
+                pasoE.appendChild(accionSemanticaEjecutada);
+                for(int i=0;i<step.getChangedNodes().size();i++){
+                    Element nodo = doc.createElement("nodo");
+                    pasoE.appendChild(nodo);
+                    Element refNodo = doc.createElement("refNodo");
+                    refNodo.setTextContent(step.getChangedNodes().get(i).toString());
+                    nodo.appendChild(refNodo);
+                    Element atributos = doc.createElement("atributos");
+                    atributos.setTextContent(step.getChanges().get(i));
+                    nodo.appendChild(atributos);
+                    
+                }
             }
         }
     }

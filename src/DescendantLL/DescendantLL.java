@@ -15,9 +15,13 @@ public class DescendantLL {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        LL ll= new LL("Descendant.txt");
-        ll.build();
-        ll.proccess("2 * 4 + 3 ;");
+//        if(args[0].equals("descendente")){
+//            LL ll= new LL(args[1]);
+            LL ll= new LL("Descendant.txt");
+            ll.build();
+//            ll.proccess(args[2]);
+            ll.proccess("2 * 4 + 3 ;");
+//        }
     }
     
 }

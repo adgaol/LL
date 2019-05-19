@@ -1,0 +1,1 @@
+E::= T {Ep.valor=T.result;} Ep {E.result=Ep.result}

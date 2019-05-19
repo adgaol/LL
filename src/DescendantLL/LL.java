@@ -4,7 +4,6 @@
  * and open the template in the editor.
  */
 package DescendantLL;
-import com.sun.xml.internal.ws.util.StringUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,7 +47,7 @@ public class LL {
     private ArrayList<String> terminals;
     private ArrayList<String> noTerminals;
     private String entryChain;
-    private HashMap<String, Double> values;
+    private HashMap<String, Stack<Integer>> values;
     private Document doc;
     private Integer ruleCount=1;
     private ArrayList<String> antecedentes;
@@ -143,7 +142,9 @@ public class LL {
         for(int i=chain.length-1;i>=0;i--){
             stackChain.push(chain[i]);
         }
+        int count=0;
         while(!stack.isEmpty()){
+            
             if(stack.peek().equals("$")){
                 stack.pop();
                 nivel--;
@@ -151,21 +152,34 @@ public class LL {
             else{
                 String pendChain=representChain(stackChain);
                 if(!stackChain.isEmpty()&&Character.isDigit(stackChain.peek().charAt(0))){
-                    Double value=Double.parseDouble(stackChain.pop());
-                    values.put("num.vlex", value);
+                    Integer value=Integer.parseInt(stackChain.pop());
+                    Stack<Integer> aux=values.get("num.vlex");
+                    if(values.get("num.vlex")==null){
+                        aux=new Stack<>();
+                        values.put("num.vlex", aux);
+                                
+                    }
+                        
+                    aux.push(value);
                     stackChain.push("num");
                 }
                 if(!stackChain.isEmpty()&&stack.peek().equals(stackChain.peek())){
                     String element=stack.pop();
                     Paso p=null;
+                    String idRegla=null;
+                    Integer widthRegla=null;
+                    if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                      idRegla=symbolRules.get(element).pop();
+                      widthRegla=idsRules.get(idRegla).length();  
+                    }
                     if(element.equals("num")){
-                        stackChainRead+=" "+values.get("num.vlex").toString();
+                        stackChainRead+=" "+values.get("num.vlex").peek().toString();
                         stackChain.pop();
-                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element,"num.vlex="+ values.get("num.vlex").toString(),relNodes.get(element), null, null);
+                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element,"num.vlex="+ values.get("num.vlex").peek().toString(),relNodes.get(element), idRegla, widthRegla);
                     }
                     else{
                         stackChainRead+=" "+stackChain.pop();
-                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, null,relNodes.get(element), null, null);
+                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, null,relNodes.get(element), idRegla, widthRegla);
                     }
                    
                     
@@ -181,30 +195,41 @@ public class LL {
                 }
                 else{
                     if(!stack.peek().startsWith("{")){
-
+                        
                         if(stack.peek().equals("λ")){
                             String element=stack.pop();
                             
                             Node node=new Node(numNodos,element , true, nivel);
                             numNodos++;
                             nodes.add(node);
-                            String idRule=symbolRules.get(element).pop();
-                            Paso p=new Paso(paso, "derivacion", stackChainRead.substring(1), representChain(stackChain), element, null, relNodes.get(element), idRule, idsRules.get(idRule).split(" ").length);
+                            String idRegla=null;
+                            Integer widthRegla=null;
+                            if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                                idRegla=symbolRules.get(element).pop();
+                                widthRegla=idsRules.get(idRegla).length();  
+                            }
+                            Paso p=new Paso(paso, "derivacion", stackChainRead.substring(1), representChain(stackChain), element, null, relNodes.get(element), idRegla, widthRegla);
                                 
                             steps.add(p);
                             paso++;
                         }
                         else{
+                            count=0;
                             if(!grammarWithActions.containsKey(stack.peek())){
                                 String symbol=stack.pop();
                                 Integer index=getNumberIndex(symbol);
-                                stack.push(symbol.substring(0, index));
+                                String element=symbol.substring(0, index);
+                                stack.push(element);
 
                                 Integer num=table.get(stack.pop()).get(stackChain.peek());
                                 String production=numRules.get(num);
                                 String[] symbols=production.split(" ");
                                 stack.push("$");
+                                
                                 for(int i=symbols.length-1;i>0;i--){
+                                    if(symbols[i].startsWith("{")){
+                                        symbols[i]=symbols[i]+symbol;
+                                    }
                                     stack.push(symbols[i]);
                                     relNodes.put(symbols[i],paso);
                                     Stack<String> ids=null;
@@ -223,14 +248,27 @@ public class LL {
                                 Node node=new Node(numNodos,symbol , false, nivel-1);
                                 numNodos++;
                                 nodes.add(node);
-                                String idRule=symbolRules.get(symbol).pop();
+                                String idRegla=null;
+                                Integer widthRegla=null;
+                                if(symbol.equals(idsRules.get(symbolRules.get(symbol).peek()).split(" ")[1])){
+                                    idRegla=symbolRules.get(symbol).pop();
+                                    widthRegla=idsRules.get(idRegla).length();  
+                                }
                                 String readChain=null;
                                 if(!stackChainRead.isEmpty())
                                         readChain=stackChainRead.substring(1);
-                                String value=symbol+".result=null";
-                                if(values.get(symbol)!=null)
-                                    value=values.get(symbol).toString();
-                                Paso p=new Paso(paso, "derivacion", readChain, representChain(stackChain), symbol, value, relNodes.get(symbol), idRule, idsRules.get(idRule).split(" ").length);
+                                if(!values.containsKey(element+".result")){
+                                    Stack<Integer> aux=new Stack<>();
+                                    values.put(element+".result", aux);
+                                    aux.push(null);
+                                }
+                                String value=getValues(element);
+                                if (value==null)
+                                    value=symbol+".result=null";
+                                
+//                                if(values.get(symbol)!=null)
+//                                    value=values.get(symbol).toString();
+                                Paso p=new Paso(paso, "derivacion", readChain, representChain(stackChain), symbol, value, relNodes.get(symbol), idRegla, widthRegla);
                                 
                                 steps.add(p);
                                 paso++;
@@ -243,6 +281,9 @@ public class LL {
                                 String[] symbols=production.split(" ");
                                 stack.push("$");
                                 for(int i=symbols.length-1;i>0;i--){
+                                    if(symbols[i].startsWith("{")){
+                                        symbols[i]=symbols[i]+element;
+                                    }
                                     stack.push(symbols[i]);
                                     relNodes.put(symbols[i],paso);
                                     Stack<String> ids=null;
@@ -266,14 +307,29 @@ public class LL {
                                     p=new Paso(paso, "primero", null, representChain(stackChain), element, null, relNodes.get(element), null, null);
                                 }
                                 else{
-                                    String idRule=symbolRules.get(element).pop();
+                                    String idRegla=null;
+                                    Integer widthRegla=null;
+                                    if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                                        idRegla=symbolRules.get(element).pop();
+                                        widthRegla=idsRules.get(idRegla).length();  
+                                    }
                                     String readChain=null;
                                     if(!stackChainRead.isEmpty())
                                         readChain=stackChainRead.substring(1);
-                                    String value=element+".result=null";;
-                                    if(values.get(element)!=null)
-                                        value=values.get(element).toString();
-                                    p=new Paso(paso, "derivacion", readChain, representChain(stackChain), element, value, relNodes.get(element), idRule, idsRules.get(idRule).split(" ").length);
+                                    Stack<Integer> aux;
+                                    if(!values.containsKey(element+".result")){
+                                        aux=new Stack<>();
+                                        values.put(element+".result", aux);
+                                        
+                                    }
+                                    values.get(element+".result").push(null);
+                                    String value=getValues(element);
+                                    if (value==null)
+                                        value=element+".result=null";
+                                    
+//                                    if(values.get(element)!=null)
+//                                        value=values.get(element).toString();
+                                    p=new Paso(paso, "derivacion", readChain, representChain(stackChain), element, value, relNodes.get(element), idRegla, widthRegla);
                                 }
                                 steps.add(p);
                                 paso++;
@@ -282,12 +338,20 @@ public class LL {
                     }
                     else{
                         String action=stack.pop();
-
+                        
+                        String recursive;
+                        //if(action.split("}").length>1){
+                            recursive=action.split("}")[1];
+                            action=action.substring(0,action.length()-recursive.length());
+                        //}
                         String[] varValue=action.substring(1,action.length()-2).split("=");
-
+                        
+                        String noTerminalWithNumber=varValue[0];
+                        
                         Integer position=getNumberIndex(varValue[0].split("\\.")[0]);
                         Paso pasoActual=steps.get(steps.size()-1);
                         if(varValue.length>1){
+//                            String noTerminalWithNumber=varValue[0];
                             if (position<varValue[0].split("\\.")[0].length()){
                                 varValue[0]=varValue[0].split("\\.")[0].substring(0,position)+"."+varValue[0].split("\\.")[1];
 
@@ -297,22 +361,56 @@ public class LL {
                                 varValue[1]=varValue[1].split("\\.")[0].substring(0,position)+"."+varValue[1].split("\\.")[1];
 
                             }
-                            if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
-                                Double value=calculateValue(varValue[1]);
-                                values.put(varValue[0], value);
-                            }
+                            
+                                if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
+                                    Integer value=calculateValue(varValue[1]);
+                                    Stack<Integer> aux=values.get(varValue[0]);
+                                    if(aux==null){
+                                        aux=new Stack<>();
+                                        values.put(varValue[0], aux);
+                                    }
+                                    aux.push(value);
+    //                                if(!noTerminalWithNumber.equals(varValue[0])){
+    //                                    aux=values.get(noTerminalWithNumber);
+    //                                    if(aux==null){
+    //                                        aux=new Stack<>();
+    //                                        values.put(noTerminalWithNumber, aux);
+    //                                    }
+    //                                    aux.push(value);
+    //                                }
+                                }
 
-                            else{
-                                values.put(varValue[0], values.get(varValue[1]));
+                                else{
+                                    Stack<Integer> aux=values.get(varValue[0]);
+                                    if(aux==null){
+                                        aux=new Stack<>();
+                                        values.put(varValue[0], aux);
+                                    }
+                                    aux.push(values.get(varValue[1]).peek());
+    //                                if(!noTerminalWithNumber.equals(varValue[0])){
+    //                                    aux=values.get(noTerminalWithNumber);
+    //                                    if(aux==null){
+    //                                        aux=new Stack<>();
+    //                                        values.put(noTerminalWithNumber, aux);
+    //                                    }
+    //                                    aux.push(values.get(varValue[1]).peek());
+    //                                }
+                                }
+                                //varValue[0]=noTerminalWithNumber;
+                            if(antecedentes.contains(noTerminalWithNumber.split("\\.")[0])){
+                                ArrayList<Paso> stepsBefore=findSteps(varValue[0],pasoActual,recursive);
+                                for (Paso stepBefore:stepsBefore){
+                                    pasoActual.getChangedNodes().add(stepBefore.getId());
+                                    String bucar=varValue[0].split("\\.")[0];
+                                    pasoActual.getChanges().add(getValues(varValue[0].split("\\.")[0]));//varValue[0]+"="+values.get(varValue[0]).peek());
+
+                                }
+                                if(count==0&&pasoActual.getElemento().equals("λ")&&values.get(varValue[0].split("\\.")[0]+".valor")!=null){
+                                    
+                                    values.get(varValue[0].split("\\.")[0]+".valor").pop();
+                                }
+                                count=1;
                             }
-                            ArrayList<Paso> stepsBefore=findSteps(varValue[0],pasoActual);
-                            for (Paso stepBefore:stepsBefore){
-                                pasoActual.getChangedNodes().add(stepBefore.getId());
-                                pasoActual.getChanges().add(varValue[0]+"="+values.get(varValue[0]));
-                                
-                            }
-                            
-                            
                         }
                     }
                 }    
@@ -851,18 +949,18 @@ public class LL {
      * @return 
      * the result of the operation
      */
-    public Double calculateValue(String operation){
-        Double result=0.0;
+    public Integer calculateValue(String operation){
+        Integer result=0;
         
         if(operation.contains("+"))
-            result=values.get(operation.split("\\+")[0])+values.get(operation.split("\\+")[1]);
+            result=values.get(operation.split("\\+")[0]).peek()+values.get(operation.split("\\+")[1]).peek();
         else if(operation.contains("-"))
-            result=values.get(operation.split("-")[0])-values.get(operation.split("-")[1]);
+            result=values.get(operation.split("-")[0]).peek()-values.get(operation.split("-")[1]).peek();
         else if(operation.contains("*")){
-            result=values.get(operation.split("\\*")[0])*values.get(operation.split("\\*")[1]);
+            result=values.get(operation.split("\\*")[0]).peek()*values.get(operation.split("\\*")[1]).peek();
         }
         else if(operation.contains("/"))
-            result=values.get(operation.split("/")[0])/values.get(operation.split("/")[1]);
+            result=values.get(operation.split("/")[0]).peek()/values.get(operation.split("/")[1]).peek();
         return result;
     } 
     /**
@@ -1047,7 +1145,7 @@ public class LL {
         String result="";
         for(String elem:stackChain){
             if(elem.equals("num"))
-                result=values.get("num.vlex")+" "+result;
+                result=values.get("num.vlex").peek()+" "+result;
             else
                 result=elem+" "+result;
         }
@@ -1062,15 +1160,33 @@ public class LL {
      * @return 
      * list of the steps that content the changedValue.
      */
-    private ArrayList<Paso> findSteps(String changeValue, Paso pasoActual) {
-       Paso step=pasoActual;
-       ArrayList<Paso> pasos=new ArrayList<>();
-       while (step.getRelNodo()>0){
-           if(step.getValor()!=null && step.getValor().contains(changeValue))
-               pasos.add(step);
-           step=steps.get(step.getRelNodo());
+    private ArrayList<Paso> findSteps(String changeValue, Paso pasoActual, String noTerminalWithNumber) {
+        Paso step=pasoActual;
+        ArrayList<Paso> pasos=new ArrayList<>();
+        while (step.getRelNodo()!=null){
+            if(step.getValor()!=null && step.getValor().contains(changeValue))
+                if(/*step.getElemento().equals(changeValue.split("\\.")[0])||*/(noTerminalWithNumber!=null&&step.getElemento().equals(noTerminalWithNumber)))
+                    pasos.add(step);
+                
+            step=steps.get(step.getRelNodo());
        }
        return pasos;
+    }
+    /**
+     * obtain the values of the symbol
+     * @param symbol
+     * symbol to find values
+     * @return 
+     * String with the values
+     */
+    private String getValues(String symbol){
+        String result="";
+        for(String key:values.keySet()){
+            if(key.contains(symbol+".")&&!values.get(key).isEmpty()){
+                result+=key+"="+values.get(key).peek()+" ";
+            }
+        }
+        return result.substring(0,result.length()-1);
     }
     /**
      * write the part of <contenido> of the xml
@@ -1125,7 +1241,7 @@ public class LL {
                 pasoE.appendChild(accionSemanticaEjecutada);
                 for(int i=0;i<step.getChangedNodes().size();i++){
                     Element nodo = doc.createElement("nodo");
-                    pasoE.appendChild(nodo);
+                    accionSemanticaEjecutada.appendChild(nodo);
                     Element refNodo = doc.createElement("refNodo");
                     refNodo.setTextContent(step.getChangedNodes().get(i).toString());
                     nodo.appendChild(refNodo);
@@ -1137,4 +1253,5 @@ public class LL {
             }
         }
     }
+    
 }

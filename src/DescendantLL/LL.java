@@ -57,7 +57,7 @@ public class LL {
     private Integer altura=0;
     private Integer paso=0;
     private ArrayList<Paso> steps;
-    private HashMap<String, Integer> relNodes;
+    private HashMap<String, Stack<Integer>> relNodes;
     private HashMap<String,String> ruleId;//production, id of the rule
     private HashMap<String,String> idsRules;//id of the rule,production
     
@@ -88,7 +88,7 @@ public class LL {
         this.ruleId=new HashMap<>();
         this.symbolRules=new HashMap<>();
         this.idsRules=new HashMap<>();
-        System.out.println("ce finit");
+        
     }
     /**
      * build the processador
@@ -105,7 +105,7 @@ public class LL {
      * @param entryChain 
      * chain to process
      */
-    public void proccess(String entryChain){
+    public void proccess(String entryChain, String pathResult){
         this.entryChain=entryChain;
         
         DocumentBuilderFactory dbFactory =DocumentBuilderFactory.newInstance();
@@ -126,7 +126,7 @@ public class LL {
         espec.setAttributeNode(attr); 
         writeTraductor(espec);
         Stack<String> stack=new Stack<>();
-//        stack.push("$");
+        stack.push("$");
 //        stack.push("$");
         stack.push(axioma);
         nivel=1;
@@ -134,6 +134,7 @@ public class LL {
 //        numNodos++;
 //        nodes.add(axiom);
         Stack<String> stackChain=new Stack<>();
+        stackChain.push("$");
         String stackChainRead="";
 //        Stack<String> stackChainRead=new Stack<>();
 //        stackChain.push("$");
@@ -143,277 +144,300 @@ public class LL {
             stackChain.push(chain[i]);
         }
         int count=0;
+        boolean aximaFinish=false;
         while(!stack.isEmpty()){
             
-            if(stack.peek().equals("$")){
+            if(stack.peek().equals("$")&&stackChain.peek().equals("$")){
                 stack.pop();
-                nivel--;
             }
             else{
-                String pendChain=representChain(stackChain);
-                if(!stackChain.isEmpty()&&Character.isDigit(stackChain.peek().charAt(0))){
-                    Integer value=Integer.parseInt(stackChain.pop());
-                    Stack<Integer> aux=values.get("num.vlex");
-                    if(values.get("num.vlex")==null){
-                        aux=new Stack<>();
-                        values.put("num.vlex", aux);
-                                
-                    }
-                        
-                    aux.push(value);
-                    stackChain.push("num");
-                }
-                if(!stackChain.isEmpty()&&stack.peek().equals(stackChain.peek())){
-                    String element=stack.pop();
-                    Paso p=null;
-                    String idRegla=null;
-                    Integer widthRegla=null;
-                    if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
-                      idRegla=symbolRules.get(element).pop();
-                      widthRegla=idsRules.get(idRegla).length();  
-                    }
-                    if(element.equals("num")){
-                        stackChainRead+=" "+values.get("num.vlex").peek().toString();
-                        stackChain.pop();
-                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element,"num.vlex="+ values.get("num.vlex").peek().toString(),relNodes.get(element), idRegla, widthRegla);
-                    }
-                    else{
-                        stackChainRead+=" "+stackChain.pop();
-                        p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, null,relNodes.get(element), idRegla, widthRegla);
-                    }
-                   
-                    
-                    Node node=new Node(numNodos,element , true, nivel);
-                    numNodos++;
-                    nodes.add(node);
-                    
-                    //Paso p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, values.get("num.vlex").toString(),relNodes.get(element), null, null);
-                    
-                    steps.add(p);
-                    paso++;
-                    
+                if(stack.peek().equals("#")){
+                    stack.pop();
+                    nivel--;
                 }
                 else{
-                    if(!stack.peek().startsWith("{")){
-                        
-                        if(stack.peek().equals("λ")){
-                            String element=stack.pop();
-                            
-                            Node node=new Node(numNodos,element , true, nivel);
-                            numNodos++;
-                            nodes.add(node);
-                            String idRegla=null;
-                            Integer widthRegla=null;
-                            if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
-                                idRegla=symbolRules.get(element).pop();
-                                widthRegla=idsRules.get(idRegla).length();  
-                            }
-                            Paso p=new Paso(paso, "derivacion", stackChainRead.substring(1), representChain(stackChain), element, null, relNodes.get(element), idRegla, widthRegla);
-                                
-                            steps.add(p);
-                            paso++;
+                    String pendChain=representChain(stackChain);
+                    if(!stackChain.isEmpty()&&Character.isDigit(stackChain.peek().charAt(0))){
+                        Integer value=Integer.parseInt(stackChain.pop());
+                        Stack<Integer> aux=values.get("num.vlex");
+                        if(values.get("num.vlex")==null){
+                            aux=new Stack<>();
+                            values.put("num.vlex", aux);
+
+                        }
+
+                        aux.push(value);
+                        stackChain.push("num");
+                    }
+                    if(!stackChain.isEmpty()&&stack.peek().equals(stackChain.peek())){
+                        String element=stack.pop();
+                        Paso p=null;
+                        String idRegla=null;
+                        Integer widthRegla=null;
+                        if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                          idRegla=symbolRules.get(element).pop();
+                          widthRegla=idsRules.get(idRegla).length();  
+                        }
+                        if(element.equals("num")){
+                            stackChainRead+=" "+values.get("num.vlex").peek().toString();
+                            stackChain.pop();
+                            String pendingChain= representChain(stackChain);
+                            p=new Paso(paso, "despDes", stackChainRead.substring(1),pendingChain.substring(0,pendingChain.length()-2 ), element,"num.vlex="+ values.get("num.vlex").peek().toString(),relNodes.get(element).pop(), idRegla, widthRegla);
                         }
                         else{
-                            count=0;
-                            if(!grammarWithActions.containsKey(stack.peek())){
-                                String symbol=stack.pop();
-                                Integer index=getNumberIndex(symbol);
-                                String element=symbol.substring(0, index);
-                                stack.push(element);
+                            stackChainRead+=" "+stackChain.pop();
+                            String pendingChain= representChain(stackChain);
+                            p=new Paso(paso, "despDes", stackChainRead.substring(1), pendingChain.substring(0,pendingChain.length()-2 ), element, null,relNodes.get(element).pop(), idRegla, widthRegla);
+                        }
 
-                                Integer num=table.get(stack.pop()).get(stackChain.peek());
-                                String production=numRules.get(num);
-                                String[] symbols=production.split(" ");
-                                stack.push("$");
-                                
-                                for(int i=symbols.length-1;i>0;i--){
-                                    if(symbols[i].startsWith("{")){
-                                        symbols[i]=symbols[i]+symbol;
-                                    }
-                                    stack.push(symbols[i]);
-                                    relNodes.put(symbols[i],paso);
-                                    Stack<String> ids=null;
-                                    if(symbolRules.get(symbols[i])==null){
-                                        ids=new Stack<>();
-                                        symbolRules.put(symbols[i], ids);
-                                    }
-                                    else{
-                                        ids=symbolRules.get(symbols[i]);
-                                    }
-                                    ids.push(ruleId.get(production));
-                                }
 
-                                nivel++;
-                                altura=Math.max(altura, nivel);
-                                Node node=new Node(numNodos,symbol , false, nivel-1);
+                        Node node=new Node(numNodos,element , true, nivel);
+                        numNodos++;
+                        nodes.add(node);
+
+                        //Paso p=new Paso(paso, "despDes", stackChainRead.substring(1), representChain(stackChain), element, values.get("num.vlex").toString(),relNodes.get(element), null, null);
+
+                        steps.add(p);
+                        paso++;
+
+                    }
+                    else{
+                        if(!stack.peek().startsWith("{")){
+
+                            if(stack.peek().equals("λ")){
+                                String element=stack.pop();
+
+                                Node node=new Node(numNodos,element , true, nivel);
                                 numNodos++;
                                 nodes.add(node);
                                 String idRegla=null;
                                 Integer widthRegla=null;
-                                if(symbol.equals(idsRules.get(symbolRules.get(symbol).peek()).split(" ")[1])){
-                                    idRegla=symbolRules.get(symbol).pop();
+                                if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                                    idRegla=symbolRules.get(element).pop();
                                     widthRegla=idsRules.get(idRegla).length();  
                                 }
-                                String readChain=null;
-                                if(!stackChainRead.isEmpty())
-                                        readChain=stackChainRead.substring(1);
-                                if(!values.containsKey(element+".result")){
-                                    Stack<Integer> aux=new Stack<>();
-                                    values.put(element+".result", aux);
-                                    aux.push(null);
-                                }
-                                String value=getValues(element);
-                                if (value==null)
-                                    value=symbol+".result=null";
-                                
-//                                if(values.get(symbol)!=null)
-//                                    value=values.get(symbol).toString();
-                                Paso p=new Paso(paso, "derivacion", readChain, representChain(stackChain), symbol, value, relNodes.get(symbol), idRegla, widthRegla);
-                                
+                                String pendingChain=representChain(stackChain);
+                                Paso p=new Paso(paso, "derivacion", stackChainRead.substring(1), pendingChain.substring(0,pendingChain.length()-2 ), element, null, relNodes.get(element).pop(), idRegla, widthRegla);
+
                                 steps.add(p);
                                 paso++;
-
                             }
                             else{
-                                String element=stack.pop();
-                                Integer num=table.get(element).get(stackChain.peek());
-                                String production=numRules.get(num);
-                                String[] symbols=production.split(" ");
-                                stack.push("$");
-                                for(int i=symbols.length-1;i>0;i--){
-                                    if(symbols[i].startsWith("{")){
-                                        symbols[i]=symbols[i]+element;
-                                    }
-                                    stack.push(symbols[i]);
-                                    relNodes.put(symbols[i],paso);
-                                    Stack<String> ids=null;
-                                    if(symbolRules.get(symbols[i])==null){
-                                        ids=new Stack<>();
-                                        symbolRules.put(symbols[i], ids);
-                                    }
-                                    else{
-                                        ids=symbolRules.get(symbols[i]);
-                                    }
-                                    ids.push(ruleId.get(production));
-                                }
+                                count=0;
+                                if(!grammarWithActions.containsKey(stack.peek())){
+                                    String symbol=stack.pop();
+                                    Integer index=getNumberIndex(symbol);
+                                    String element=symbol.substring(0, index);
+                                    stack.push(element);
 
-                                nivel++;
-                                altura=Math.max(altura, nivel);
-                                Node node=new Node(numNodos,element , false, nivel-1);
-                                numNodos++;
-                                nodes.add(node);
-                                Paso p=null;
-                                if(axioma.equals(element)){
-                                    p=new Paso(paso, "primero", null, representChain(stackChain), element, null, relNodes.get(element), null, null);
-                                }
-                                else{
+                                    Integer num=table.get(stack.pop()).get(stackChain.peek());
+                                    String production=numRules.get(num);
+                                    String[] symbols=production.split(" ");
+                                    stack.push("#");
+                                    
+                                    for(int i=symbols.length-1;i>0;i--){
+                                        if(symbols[i].startsWith("{")){
+                                            symbols[i]=symbols[i]+symbol;
+                                        }
+                                        stack.push(symbols[i]);
+                                        Stack<Integer> relNodeSim=relNodes.get(symbols[i]);
+                                        if(relNodeSim==null){
+                                            relNodeSim=new Stack<>();
+                                            relNodes.put(symbols[i],relNodeSim);
+                                        }
+                                        relNodeSim.push(paso);
+                                        Stack<String> ids=null;
+                                        if(symbolRules.get(symbols[i])==null){
+                                            ids=new Stack<>();
+                                            symbolRules.put(symbols[i], ids);
+                                        }
+                                        else{
+                                            ids=symbolRules.get(symbols[i]);
+                                        }
+                                        ids.push(ruleId.get(production));
+                                    }
+
+                                    nivel++;
+                                    altura=Math.max(altura, nivel);
+                                    Node node=new Node(numNodos,symbol , false, nivel-1);
+                                    numNodos++;
+                                    nodes.add(node);
                                     String idRegla=null;
                                     Integer widthRegla=null;
-                                    if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
-                                        idRegla=symbolRules.get(element).pop();
+                                    if(symbol.equals(idsRules.get(symbolRules.get(symbol).peek()).split(" ")[1])){
+                                        idRegla=symbolRules.get(symbol).pop();
                                         widthRegla=idsRules.get(idRegla).length();  
                                     }
                                     String readChain=null;
                                     if(!stackChainRead.isEmpty())
-                                        readChain=stackChainRead.substring(1);
-                                    Stack<Integer> aux;
+                                            readChain=stackChainRead.substring(1);
                                     if(!values.containsKey(element+".result")){
-                                        aux=new Stack<>();
+                                        Stack<Integer> aux=new Stack<>();
                                         values.put(element+".result", aux);
-                                        
+                                        aux.push(null);
                                     }
-                                    values.get(element+".result").push(null);
                                     String value=getValues(element);
                                     if (value==null)
-                                        value=element+".result=null";
-                                    
-//                                    if(values.get(element)!=null)
-//                                        value=values.get(element).toString();
-                                    p=new Paso(paso, "derivacion", readChain, representChain(stackChain), element, value, relNodes.get(element), idRegla, widthRegla);
+                                        value=symbol+".result=null";
+
+    //                                if(values.get(symbol)!=null)
+    //                                    value=values.get(symbol).toString();
+                                    String pendingChain=representChain(stackChain);
+                                    Paso p=new Paso(paso, "derivacion", readChain,pendingChain.substring(0,pendingChain.length()-2 ), symbol, value, relNodes.get(symbol).pop(), idRegla, widthRegla);
+
+                                    steps.add(p);
+                                    paso++;
+
                                 }
-                                steps.add(p);
-                                paso++;
-                            }
-                        }
-                    }
-                    else{
-                        String action=stack.pop();
-                        
-                        String recursive;
-                        //if(action.split("}").length>1){
-                            recursive=action.split("}")[1];
-                            action=action.substring(0,action.length()-recursive.length());
-                        //}
-                        String[] varValue=action.substring(1,action.length()-2).split("=");
-                        
-                        String noTerminalWithNumber=varValue[0];
-                        
-                        Integer position=getNumberIndex(varValue[0].split("\\.")[0]);
-                        Paso pasoActual=steps.get(steps.size()-1);
-                        if(varValue.length>1){
-//                            String noTerminalWithNumber=varValue[0];
-                            if (position<varValue[0].split("\\.")[0].length()){
-                                varValue[0]=varValue[0].split("\\.")[0].substring(0,position)+"."+varValue[0].split("\\.")[1];
-
-                            }
-                            position=getNumberIndex(varValue[1].split("\\.")[0]);
-                            if (position<varValue[1].split("\\.")[0].length()){
-                                varValue[1]=varValue[1].split("\\.")[0].substring(0,position)+"."+varValue[1].split("\\.")[1];
-
-                            }
-                            
-                                if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
-                                    Integer value=calculateValue(varValue[1]);
-                                    Stack<Integer> aux=values.get(varValue[0]);
-                                    if(aux==null){
-                                        aux=new Stack<>();
-                                        values.put(varValue[0], aux);
-                                    }
-                                    aux.push(value);
-    //                                if(!noTerminalWithNumber.equals(varValue[0])){
-    //                                    aux=values.get(noTerminalWithNumber);
-    //                                    if(aux==null){
-    //                                        aux=new Stack<>();
-    //                                        values.put(noTerminalWithNumber, aux);
-    //                                    }
-    //                                    aux.push(value);
-    //                                }
-                                }
-
                                 else{
-                                    Stack<Integer> aux=values.get(varValue[0]);
-                                    if(aux==null){
-                                        aux=new Stack<>();
-                                        values.put(varValue[0], aux);
+                                    String element=stack.pop();
+                                    Integer num=table.get(element).get(stackChain.peek());
+                                    String production=numRules.get(num);
+                                    String[] symbols=production.split(" ");
+                                    stack.push("#");
+                                    for(int i=symbols.length-1;i>0;i--){
+                                        if(symbols[i].startsWith("{")){
+                                            symbols[i]=symbols[i]+element;
+                                        }
+                                        stack.push(symbols[i]);
+                                        Stack<Integer> relNodeSim=relNodes.get(symbols[i]);
+                                        if(relNodeSim==null){
+                                            relNodeSim=new Stack<>();
+                                            relNodes.put(symbols[i],relNodeSim);
+                                        }
+                                        relNodeSim.push(paso);
+                                        Stack<String> ids=null;
+                                        if(symbolRules.get(symbols[i])==null){
+                                            ids=new Stack<>();
+                                            symbolRules.put(symbols[i], ids);
+                                        }
+                                        else{
+                                            ids=symbolRules.get(symbols[i]);
+                                        }
+                                        ids.push(ruleId.get(production));
                                     }
-                                    aux.push(values.get(varValue[1]).peek());
-    //                                if(!noTerminalWithNumber.equals(varValue[0])){
-    //                                    aux=values.get(noTerminalWithNumber);
-    //                                    if(aux==null){
-    //                                        aux=new Stack<>();
-    //                                        values.put(noTerminalWithNumber, aux);
-    //                                    }
-    //                                    aux.push(values.get(varValue[1]).peek());
-    //                                }
-                                }
-                                //varValue[0]=noTerminalWithNumber;
-                            if(antecedentes.contains(noTerminalWithNumber.split("\\.")[0])){
-                                ArrayList<Paso> stepsBefore=findSteps(varValue[0],pasoActual,recursive);
-                                for (Paso stepBefore:stepsBefore){
-                                    pasoActual.getChangedNodes().add(stepBefore.getId());
-                                    String bucar=varValue[0].split("\\.")[0];
-                                    pasoActual.getChanges().add(getValues(varValue[0].split("\\.")[0]));//varValue[0]+"="+values.get(varValue[0]).peek());
 
+                                    nivel++;
+                                    altura=Math.max(altura, nivel);
+                                    Node node=new Node(numNodos,element , false, nivel-1);
+                                    numNodos++;
+                                    nodes.add(node);
+                                    Paso p=null;
+                                    if(!aximaFinish && axioma.equals(element)){
+                                        String pendingChain=representChain(stackChain);
+                                        p=new Paso(paso, "primero", null,pendingChain.substring(0,pendingChain.length()-2 ) , element, null, null, null, null);
+                                        aximaFinish=true;
+                                    }
+                                    else{
+                                        String idRegla=null;
+                                        Integer widthRegla=null;
+                                        if(element.equals(idsRules.get(symbolRules.get(element).peek()).split(" ")[1])){
+                                            idRegla=symbolRules.get(element).pop();
+                                            widthRegla=idsRules.get(idRegla).length();  
+                                        }
+                                        String readChain=null;
+                                        if(!stackChainRead.isEmpty())
+                                            readChain=stackChainRead.substring(1);
+                                        Stack<Integer> aux;
+                                        if(!values.containsKey(element+".result")){
+                                            aux=new Stack<>();
+                                            values.put(element+".result", aux);
+
+                                        }
+                                        values.get(element+".result").push(null);
+                                        String value=getValues(element);
+                                        if (value==null)
+                                            value=element+".result=null";
+
+    //                                    if(values.get(element)!=null)
+    //                                        value=values.get(element).toString();
+                                        String pendingChain=representChain(stackChain);
+                                        p=new Paso(paso, "derivacion", readChain, pendingChain.substring(0,pendingChain.length()-2 ), element, value, relNodes.get(element).pop(), idRegla, widthRegla);
+                                    }
+                                    steps.add(p);
+                                    paso++;
                                 }
-                                if(count==0&&pasoActual.getElemento().equals("λ")&&values.get(varValue[0].split("\\.")[0]+".valor")!=null){
-                                    
-                                    values.get(varValue[0].split("\\.")[0]+".valor").pop();
-                                }
-                                count=1;
                             }
                         }
-                    }
-                }    
+                        else{
+                            String action=stack.pop();
+
+                            String recursive;
+                            //if(action.split("}").length>1){
+                                recursive=action.split("}")[1];
+                                action=action.substring(0,action.length()-recursive.length());
+                            //}
+                            String[] varValue=action.substring(1,action.length()-2).split("=");
+
+                            String noTerminalWithNumber=varValue[0];
+
+                            Integer position=getNumberIndex(varValue[0].split("\\.")[0]);
+                            Paso pasoActual=steps.get(steps.size()-1);
+                            if(varValue.length>1){
+    //                            String noTerminalWithNumber=varValue[0];
+                                if (position<varValue[0].split("\\.")[0].length()){
+                                    varValue[0]=varValue[0].split("\\.")[0].substring(0,position)+"."+varValue[0].split("\\.")[1];
+
+                                }
+                                position=getNumberIndex(varValue[1].split("\\.")[0]);
+                                if (position<varValue[1].split("\\.")[0].length()){
+                                    varValue[1]=varValue[1].split("\\.")[0].substring(0,position)+"."+varValue[1].split("\\.")[1];
+
+                                }
+
+                                    if(varValue[1].contains("+")||varValue[1].contains("-")||varValue[1].contains("/")||varValue[1].contains("*")){
+                                        Integer value=calculateValue(varValue[1]);
+                                        Stack<Integer> aux=values.get(varValue[0]);
+                                        if(aux==null){
+                                            aux=new Stack<>();
+                                            values.put(varValue[0], aux);
+                                        }
+                                        aux.push(value);
+        //                                if(!noTerminalWithNumber.equals(varValue[0])){
+        //                                    aux=values.get(noTerminalWithNumber);
+        //                                    if(aux==null){
+        //                                        aux=new Stack<>();
+        //                                        values.put(noTerminalWithNumber, aux);
+        //                                    }
+        //                                    aux.push(value);
+        //                                }
+                                    }
+
+                                    else{
+                                        Stack<Integer> aux=values.get(varValue[0]);
+                                        if(aux==null){
+                                            aux=new Stack<>();
+                                            values.put(varValue[0], aux);
+                                        }
+                                        aux.push(values.get(varValue[1]).peek());
+        //                                if(!noTerminalWithNumber.equals(varValue[0])){
+        //                                    aux=values.get(noTerminalWithNumber);
+        //                                    if(aux==null){
+        //                                        aux=new Stack<>();
+        //                                        values.put(noTerminalWithNumber, aux);
+        //                                    }
+        //                                    aux.push(values.get(varValue[1]).peek());
+        //                                }
+                                    }
+                                    //varValue[0]=noTerminalWithNumber;
+                                if(antecedentes.contains(noTerminalWithNumber.split("\\.")[0])){
+                                    ArrayList<Paso> stepsBefore=findSteps(varValue[0],pasoActual,recursive);
+                                    for (Paso stepBefore:stepsBefore){
+                                        pasoActual.getChangedNodes().add(stepBefore.getId());
+                                        String bucar=varValue[0].split("\\.")[0];
+                                        pasoActual.getChanges().add(getValues(varValue[0].split("\\.")[0]));//varValue[0]+"="+values.get(varValue[0]).peek());
+
+                                    }
+                                    if(count==0&&pasoActual.getElemento().equals("λ")&&values.get(varValue[0].split("\\.")[0]+".valor")!=null){
+
+                                        values.get(varValue[0].split("\\.")[0]+".valor").pop();
+                                    }
+                                    count=1;
+                                }
+                            }
+                        }
+                    }    
+               }
            }
        }
     nivel++;
@@ -427,7 +451,7 @@ public class LL {
             Logger.getLogger(LL.class.getName()).log(Level.SEVERE, null, ex);
         }
     DOMSource source = new DOMSource(doc);
-    StreamResult result = new StreamResult(new File("./cars.xml"));
+    StreamResult result = new StreamResult(new File(pathResult));
         try {
             transformer.transform(source, result);
         } catch (TransformerException ex) {
@@ -819,13 +843,15 @@ public class LL {
      * productions with the no terminal
      */
     public ArrayList<String> productionsWith(String noTerminal){
-       ArrayList<String> result=new ArrayList<>();
-       for (String key:grammar.keySet()){
-           for(String production:grammar.get(key)){
-               if(production.contains(noTerminal)){
-                   result.add(production);
-               }
-           }
+        ArrayList<String> result=new ArrayList<>();
+        for (String key:grammar.keySet()){
+            for(String production:grammar.get(key)){
+                for (String simbolo:production.split(" ")){
+                    if(simbolo.equals(noTerminal)){
+                        result.add(production);
+                    }
+                }
+            }
        } 
        return result;
     }
